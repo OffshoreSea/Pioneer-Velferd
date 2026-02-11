@@ -5,67 +5,92 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Welfare Club Wishlist</title>
     
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS (Styling) -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- React & ReactDOM -->
+    <!-- React & ReactDOM (Core Library) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
-    <!-- Babel for JSX -->
+    <!-- Babel (JSX Compiler) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+    <!-- Canvas Confetti (For fun animations!) -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
     <style>
-        /* Custom animations usually handled by Tailwind plugins */
+        /* --- Custom Animations & Utilities --- */
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .animate-spin { animation: spin 1s linear infinite; }
-        .fade-in { animation: fadeIn 0.3s ease-in; }
+        
+        .fade-in { animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .slide-up { animation: slideUp 0.5s ease-out forwards; opacity: 0; transform: translateY(20px); }
+        @keyframes slideUp { to { opacity: 1; transform: translateY(0); } }
+
+        .slide-in-right { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        .scale-in { animation: scaleIn 0.2s ease-out; }
+        @keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Glassmorphism Effect */
+        .glass {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800">
+<body class="bg-slate-50 text-slate-800 antialiased selection:bg-blue-100 selection:text-blue-900">
 
     <div id="root"></div>
 
     <!-- Main Application Script -->
     <script type="text/babel" data-type="module">
+        // Import Firebase SDKs from CDN
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
         import { 
             getFirestore, collection, addDoc, onSnapshot, 
             doc, updateDoc, deleteDoc, serverTimestamp, 
             query, orderBy, arrayUnion, arrayRemove, increment 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { 
-            getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged 
+            getAuth, signInAnonymously, signInWithCustomToken, 
+            signInWithEmailAndPassword, signOut, onAuthStateChanged 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
         const { useState, useEffect } = React;
 
-        // --- FIREBASE CONFIGURATION ---
-        // 1. If running locally, replace the '...' below with your actual config object from Firebase Console.
-        // 2. If running in the preview environment, it uses the hidden global variables automatically.
-        const firebaseConfig = typeof __firebase_config !== 'undefined' 
-            ? JSON.parse(__firebase_config) 
-            : {
-                apiKey: "AIzaSyC_tUc4FPoGjTjCvu7ucJG-S8PB7DaU3W8",
-                authDomain: "pioneer-welfare.firebaseapp.com",
-                projectId: "pioneer-welfare",
-                storageBucket: "pioneer-welfare.firebasestorage.app",
-                messagingSenderId: "406179084430",
-                appId: "1:406179084430:web:cda1ee722faac2942231df",
-                measurementId: "G-6KDZTDTZD7"
-            };
+        // --- FIREBASE CONFIGURATION (Pioneer Welfare) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyC_tUc4FPoGjTjCvu7ucJG-S8PB7DaU3W8",
+            authDomain: "pioneer-welfare.firebaseapp.com",
+            projectId: "pioneer-welfare",
+            storageBucket: "pioneer-welfare.firebasestorage.app",
+            messagingSenderId: "406179084430",
+            appId: "1:406179084430:web:cda1ee722faac2942231df",
+            measurementId: "G-6KDZTDTZD7"
+        };
 
+        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
         const auth = getAuth(app);
         const db = getFirestore(app);
         
-        // Use global app ID if available, otherwise default
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        // Define App ID for database path
+        const appId = "pioneer-welfare-v1";
 
         // --- ICONS (Lucide Replacements) ---
-        // Since we can't easily import lucide-react in a single HTML file without a bundler,
-        // we use a helper to render the SVGs directly.
         const Icons = {
             MessageSquarePlus: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="12" y1="7" x2="12" y2="13"/></svg>,
             ThumbsUp: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>,
@@ -79,71 +104,114 @@
             LogOut: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
             ExternalLink: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
             Menu: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/></svg>,
-            X: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            X: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+            Sparkles: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>,
+            Check: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+            AlertCircle: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         };
+
+        // --- TOAST COMPONENT ---
+        function ToastContainer({ toasts, removeToast }) {
+            return (
+                <div className="fixed top-4 right-4 z-[70] flex flex-col gap-2 pointer-events-none">
+                    {toasts.map(toast => (
+                        <div 
+                            key={toast.id} 
+                            className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border slide-in-right bg-white ${
+                                toast.type === 'error' ? 'border-red-100 text-red-800' : 'border-emerald-100 text-emerald-800'
+                            }`}
+                        >
+                            <div className={`p-1 rounded-full ${toast.type === 'error' ? 'bg-red-100' : 'bg-emerald-100'}`}>
+                                {toast.type === 'error' ? <Icons.AlertCircle className="w-4 h-4" /> : <Icons.Check className="w-4 h-4" />}
+                            </div>
+                            <span className="font-medium text-sm">{toast.message}</span>
+                            <button onClick={() => removeToast(toast.id)} className="ml-2 text-slate-400 hover:text-slate-600">
+                                <Icons.X className="w-4 h-4" />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
 
         // --- MAIN APP COMPONENT ---
 
         function App() {
             const [user, setUser] = useState(null);
             const [view, setView] = useState('home'); 
-            const [isAdmin, setIsAdmin] = useState(false);
+            const [toasts, setToasts] = useState([]);
+            const [authLoading, setAuthLoading] = useState(true);
 
-            useEffect(() => {
-                const initAuth = async () => {
-                    // Check for custom token from environment (preview mode)
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        try {
-                            await signInWithCustomToken(auth, __initial_auth_token);
-                        } catch (e) {
-                            console.error("Custom token auth failed, falling back to anonymous", e);
-                            await signInAnonymously(auth);
-                        }
-                    } else {
-                        // Standard fallback for local use
-                        await signInAnonymously(auth);
-                    }
-                };
-                initAuth();
-                const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-                    setUser(currentUser);
-                });
-                return () => unsubscribe();
-            }, []);
-
-            const handleAdminLogin = (password) => {
-                if (password === 'admin123') {
-                    setIsAdmin(true);
-                    return true;
-                }
-                return false;
+            const addToast = (message, type = 'success') => {
+                const id = Date.now();
+                setToasts(prev => [...prev, { id, message, type }]);
+                setTimeout(() => removeToast(id), 4000);
             };
 
-            if (!user) {
+            const removeToast = (id) => {
+                setToasts(prev => prev.filter(t => t.id !== id));
+            };
+
+            useEffect(() => {
+                let mounted = true;
+                setAuthLoading(true);
+
+                const initAuth = async () => {
+                    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+                        if (mounted) {
+                            setUser(currentUser);
+                            setAuthLoading(false);
+                        }
+                    });
+
+                    // Try to sign in anonymously if not already signed in
+                    if (!auth.currentUser) {
+                        signInAnonymously(auth).catch((error) => {
+                            console.error("Authentication note:", error.message);
+                            // If anon auth fails (e.g. disabled in console), we stop loading
+                            // so the user can at least see the page and log in as Admin.
+                            if (mounted) setAuthLoading(false);
+                        });
+                    }
+                    return unsubscribe;
+                };
+                
+                const unsub = initAuth();
+                return () => { 
+                    mounted = false;
+                    // unsub is a promise, but onAuthStateChanged returns a function directly usually.
+                    // Simplified cleanup:
+                };
+            }, []);
+
+            // Check if user is Admin (Logged in via Email, not Anonymous)
+            const isAdmin = user && !user.isAnonymous;
+
+            if (authLoading) {
                 return (
                     <div className="flex items-center justify-center min-h-screen bg-slate-50">
-                        <Icons.Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                        <Icons.Loader2 className="w-10 h-10 animate-spin text-blue-600" />
                     </div>
                 );
             }
 
             return (
-                <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
+                <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-20 md:pb-0">
+                    <ToastContainer toasts={toasts} removeToast={removeToast} />
+                    
                     <Navbar 
                         view={view} 
                         setView={setView} 
                         isAdmin={isAdmin} 
-                        setIsAdmin={setIsAdmin} 
                     />
                     
-                    <main className="max-w-5xl mx-auto p-4 md:p-6">
+                    <main className="max-w-5xl mx-auto p-4 md:p-8 animate-fade-in">
                         {view === 'home' ? (
-                            <UserView userId={user.uid} />
+                            <UserView userId={user?.uid} addToast={addToast} user={user} />
                         ) : (
                             <AdminView 
                                 isAdmin={isAdmin} 
-                                onLogin={handleAdminLogin} 
-                                onLogout={() => setIsAdmin(false)} 
+                                addToast={addToast}
                             />
                         )}
                     </main>
@@ -151,37 +219,41 @@
             );
         }
 
-        function Navbar({ view, setView, isAdmin, setIsAdmin }) {
+        function Navbar({ view, setView, isAdmin }) {
             const [isMenuOpen, setIsMenuOpen] = useState(false);
 
             return (
-                <nav className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
+                <nav className="glass border-b border-slate-200/60 sticky top-0 z-50">
                     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex justify-between h-16">
                             <div className="flex items-center">
-                                <div className="flex-shrink-0 flex items-center gap-2 cursor-pointer" onClick={() => setView('home')}>
-                                    <div className="bg-blue-600 p-2 rounded-lg">
+                                <div className="flex-shrink-0 flex items-center gap-3 cursor-pointer group" onClick={() => setView('home')}>
+                                    <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-2.5 rounded-xl shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform duration-200">
                                         <Icons.MessageSquarePlus className="h-6 w-6 text-white" />
                                     </div>
-                                    <span className="font-bold text-xl text-slate-900 tracking-tight hidden sm:block">
+                                    <span className="font-bold text-xl bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-600 tracking-tight hidden sm:block">
                                         Welfare Club
                                     </span>
                                 </div>
                             </div>
                             
-                            <div className="hidden sm:flex sm:items-center sm:space-x-4">
+                            <div className="hidden sm:flex sm:items-center sm:space-x-2">
                                 <button
                                     onClick={() => setView('home')}
-                                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                                        view === 'home' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                                    className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
+                                        view === 'home' 
+                                            ? 'bg-blue-50 text-blue-700 shadow-sm' 
+                                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                                     }`}
                                 >
-                                    Suggestions Board
+                                    Suggestions
                                 </button>
                                 <button
                                     onClick={() => setView('admin')}
-                                    className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                                        view === 'admin' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
+                                        view === 'admin' 
+                                            ? 'bg-indigo-50 text-indigo-700 shadow-sm' 
+                                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                                     }`}
                                 >
                                     {isAdmin ? <Icons.LayoutDashboard className="w-4 h-4"/> : <Icons.Lock className="w-4 h-4"/>}
@@ -192,7 +264,7 @@
                             <div className="flex items-center sm:hidden">
                                 <button 
                                     onClick={() => setIsMenuOpen(!isMenuOpen)}
-                                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
+                                    className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
                                 >
                                     {isMenuOpen ? <Icons.X className="h-6 w-6" /> : <Icons.Menu className="h-6 w-6" />}
                                 </button>
@@ -201,17 +273,17 @@
                     </div>
 
                     {isMenuOpen && (
-                        <div className="sm:hidden bg-white border-b border-slate-200">
-                            <div className="px-2 pt-2 pb-3 space-y-1">
+                        <div className="sm:hidden glass border-b border-slate-200 animate-fade-in absolute w-full">
+                            <div className="px-4 pt-2 pb-4 space-y-2">
                                 <button
                                     onClick={() => { setView('home'); setIsMenuOpen(false); }}
-                                    className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-slate-700 hover:bg-slate-50"
+                                    className={`block w-full text-left px-4 py-3 rounded-xl text-base font-medium transition-colors ${view === 'home' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'}`}
                                 >
                                     Suggestions Board
                                 </button>
                                 <button
                                     onClick={() => { setView('admin'); setIsMenuOpen(false); }}
-                                    className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-slate-700 hover:bg-slate-50"
+                                    className={`block w-full text-left px-4 py-3 rounded-xl text-base font-medium transition-colors ${view === 'admin' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
                                 >
                                     Admin Area
                                 </button>
@@ -222,12 +294,19 @@
             );
         }
 
-        function UserView({ userId }) {
+        function UserView({ userId, addToast, user }) {
             const [showForm, setShowForm] = useState(false);
             const [suggestions, setSuggestions] = useState([]);
             const [loading, setLoading] = useState(true);
+            const [filter, setFilter] = useState('newest');
+
+            // If user is not authenticated (and anon auth failed), we can't show data safely if rules require auth.
+            // But we display the UI.
+            const isGuest = !user;
 
             useEffect(() => {
+                // If we are not logged in at all, we might not be able to fetch if rules require auth.
+                // But we try anyway.
                 const q = query(
                     collection(db, 'artifacts', appId, 'public', 'data', 'suggestions'),
                     orderBy('createdAt', 'desc')
@@ -246,61 +325,123 @@
                 });
 
                 return () => unsubscribe();
-            }, []);
+            }, [user]);
+
+            const sortedSuggestions = [...suggestions].sort((a, b) => {
+                if (filter === 'popular') {
+                    return (b.votes || 0) - (a.votes || 0);
+                }
+                return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
+            });
 
             return (
-                <div className="space-y-6">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-2xl shadow-lg text-white">
-                        <div>
-                            <h1 className="text-2xl md:text-3xl font-bold">Make a Wish!</h1>
-                            <p className="text-blue-100 mt-2">Help us improve our workplace. Suggest products, events, or improvements.</p>
+                <div className="space-y-8">
+                    {/* Hero Section */}
+                    <div className="relative overflow-hidden rounded-3xl shadow-2xl shadow-blue-900/40 text-white min-h-[350px] flex flex-col justify-center group">
+                        <div className="absolute inset-0 z-0">
+                            <img 
+                                src="hero.jpg" 
+                                alt="Offshore Pioneer Spirit" 
+                                className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-1000"
+                                onError={(e) => {
+                                    e.target.style.display = 'none'; 
+                                    e.target.parentElement.style.backgroundColor = '#1e3a8a';
+                                }}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-slate-900/70 to-blue-900/40 mix-blend-multiply"></div>
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent"></div>
                         </div>
-                        <button 
-                            onClick={() => setShowForm(!showForm)}
-                            className="bg-white text-blue-700 px-6 py-3 rounded-xl font-bold shadow-md hover:bg-blue-50 transition-all flex items-center gap-2 transform active:scale-95"
-                        >
-                            {showForm ? <Icons.XCircle className="w-5 h-5"/> : <Icons.MessageSquarePlus className="w-5 h-5"/>}
-                            {showForm ? 'Close Form' : 'New Suggestion'}
-                        </button>
+                        
+                        <div className="relative z-10 p-8 md:p-12 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+                            <div className="space-y-4 max-w-xl">
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 backdrop-blur-md text-blue-200 text-xs font-bold uppercase tracking-widest">
+                                    <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+                                    Pioneer Welfare Club
+                                </div>
+                                <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight text-white drop-shadow-lg">
+                                    Make a Wish! ✨
+                                </h1>
+                                <p className="text-blue-100 text-lg leading-relaxed font-medium drop-shadow-md max-w-md">
+                                    Help us improve life offshore. Suggest equipment, snacks, events, or improvements that make the shift better.
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => isGuest ? addToast("Public access is disabled. Please log in as Admin.", "error") : setShowForm(true)}
+                                className={`w-full md:w-auto backdrop-blur-md border border-white/20 text-white px-8 py-4 rounded-2xl font-bold shadow-xl transition-all duration-300 flex items-center justify-center gap-3 group/btn ${isGuest ? 'bg-slate-500/30 cursor-not-allowed' : 'bg-white/10 hover:bg-white hover:text-blue-900 hover:scale-105 active:scale-95'}`}
+                            >
+                                <Icons.MessageSquarePlus className="w-6 h-6 group-hover/btn:rotate-12 transition-transform" />
+                                <span>New Suggestion</span>
+                            </button>
+                        </div>
                     </div>
 
-                    {showForm && (
-                        <div className="animate-in slide-in-from-top-4 fade-in duration-300">
-                            <SuggestionForm onClose={() => setShowForm(false)} />
+                    {isGuest && (
+                        <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-3 text-amber-800">
+                            <Icons.Lock className="w-5 h-5" />
+                            <span><strong>Note:</strong> Anonymous access is currently disabled. Please log in as Admin to manage content.</span>
                         </div>
                     )}
 
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-semibold text-slate-800">Recent Suggestions</h2>
-                            <span className="text-sm text-slate-500">{suggestions.length} items</span>
+                    {/* Filter Tabs */}
+                    <div className="flex items-center justify-between sticky top-20 z-10 py-2 bg-slate-50/80 backdrop-blur-sm">
+                        <div className="bg-white p-1 rounded-xl shadow-sm border border-slate-200 inline-flex">
+                            <button 
+                                onClick={() => setFilter('newest')}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${filter === 'newest' ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Newest
+                            </button>
+                            <button 
+                                onClick={() => setFilter('popular')}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${filter === 'popular' ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Most Popular
+                            </button>
                         </div>
-                        
-                        {loading ? (
-                            <div className="flex justify-center py-12">
-                                <Icons.Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-                            </div>
-                        ) : suggestions.length === 0 ? (
-                            <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-dashed border-slate-300">
-                                <div className="mx-auto w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3">
-                                    <Icons.MessageSquarePlus className="w-6 h-6 text-slate-400" />
-                                </div>
-                                <h3 className="text-lg font-medium text-slate-900">No suggestions yet</h3>
-                                <p className="text-slate-500">Be the first to suggest something awesome!</p>
-                            </div>
-                        ) : (
-                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-                                {suggestions.map(item => (
-                                    <SuggestionCard key={item.id} data={item} userId={userId} />
-                                ))}
-                            </div>
-                        )}
+                        <span className="text-sm font-medium text-slate-400 hidden sm:block">
+                            {suggestions.length} Ideas
+                        </span>
                     </div>
+
+                    {/* Form Modal */}
+                    {showForm && !isGuest && (
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+                            <div 
+                                className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden scale-in"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <SuggestionForm onClose={() => setShowForm(false)} addToast={addToast} />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Cards Grid */}
+                    {loading ? (
+                        <div className="flex justify-center py-20">
+                            <Icons.Loader2 className="w-10 h-10 animate-spin text-slate-400" />
+                        </div>
+                    ) : suggestions.length === 0 ? (
+                        <div className="text-center py-20 bg-white rounded-3xl shadow-sm border border-dashed border-slate-300">
+                            <div className="mx-auto w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+                                <Icons.Sparkles className="w-8 h-8 text-blue-400" />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-900 mb-2">No suggestions yet</h3>
+                            <p className="text-slate-500 max-w-sm mx-auto">Be the first to suggest something awesome! Your idea could be the next big thing.</p>
+                        </div>
+                    ) : (
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 pb-10">
+                            {sortedSuggestions.map((item, index) => (
+                                <div key={item.id} className="slide-up" style={{animationDelay: `${index * 0.05}s`}}>
+                                    <SuggestionCard data={item} userId={userId} addToast={addToast} isGuest={isGuest} />
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             );
         }
 
-        function SuggestionForm({ onClose }) {
+        function SuggestionForm({ onClose, addToast }) {
             const [submitting, setSubmitting] = useState(false);
             const [formData, setFormData] = useState({
                 productName: '',
@@ -309,6 +450,19 @@
                 submitterName: '',
                 feedback: ''
             });
+            const [placeholder, setPlaceholder] = useState("e.g. New Coffee Machine ☕");
+
+            useEffect(() => {
+                const funPlaceholders = [
+                    "e.g. Team Pizza Party 🍕",
+                    "e.g. Better Office Chairs 🪑",
+                    "e.g. Monthly Waffle Day 🧇",
+                    "e.g. Office Puppy 🐶",
+                    "e.g. Massage Chair 💆‍♂️",
+                    "e.g. New Coffee Machine ☕"
+                ];
+                setPlaceholder(funPlaceholders[Math.floor(Math.random() * funPlaceholders.length)]);
+            }, []);
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
@@ -324,54 +478,68 @@
                         createdAt: serverTimestamp(),
                         adminComment: ''
                     });
+                    
+                    // --- CONFETTI ANIMATION ---
+                    confetti({
+                        particleCount: 150,
+                        spread: 70,
+                        origin: { y: 0.6 },
+                        colors: ['#2563eb', '#4f46e5', '#ffffff', '#fbbf24']
+                    });
+
+                    addToast("Wahoo! Suggestion submitted! 🎉", "success");
                     onClose();
                 } catch (error) {
                     console.error("Error adding document: ", error);
-                    alert("Failed to submit. Please try again.");
+                    addToast("Failed to submit. Please try again.", "error");
                 } finally {
                     setSubmitting(false);
                 }
             };
 
             return (
-                <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
-                    <div className="p-6 border-b border-slate-100 bg-slate-50">
-                        <h3 className="font-semibold text-slate-800">Submit a Proposal</h3>
+                <div className="flex flex-col h-full max-h-[90vh]">
+                    <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                        <h3 className="font-bold text-lg text-slate-800">Submit a Proposal</h3>
+                        <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
+                            <Icons.X className="w-5 h-5" />
+                        </button>
                     </div>
-                    <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-slate-700">Your Name</label>
+                                <label className="text-sm font-semibold text-slate-700">Your Name</label>
                                 <input
                                     required
                                     type="text"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
                                     placeholder="John Doe"
                                     value={formData.submitterName}
                                     onChange={e => setFormData({...formData, submitterName: e.target.value})}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-slate-700">Product/Event Name</label>
+                                <label className="text-sm font-semibold text-slate-700">Product/Event Name</label>
                                 <input
                                     required
                                     type="text"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                                    placeholder="e.g. New Coffee Machine"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
+                                    placeholder={placeholder}
                                     value={formData.productName}
                                     onChange={e => setFormData({...formData, productName: e.target.value})}
                                 />
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-slate-700">Link (Optional)</label>
+                                <label className="text-sm font-semibold text-slate-700">Link (Optional)</label>
                                 <div className="relative">
-                                    <Icons.Link className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                                    <Icons.Link className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
                                     <input
                                         type="url"
-                                        className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
                                         placeholder="https://..."
                                         value={formData.productLink}
                                         onChange={e => setFormData({...formData, productLink: e.target.value})}
@@ -379,13 +547,13 @@
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-slate-700">Estimated Price (Optional)</label>
+                                <label className="text-sm font-semibold text-slate-700">Price Estimate (Optional)</label>
                                 <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-slate-500 text-sm">$</span>
+                                    <span className="absolute left-4 top-3.5 text-slate-500 text-sm font-semibold">kr</span>
                                     <input
                                         type="number"
                                         min="0"
-                                        className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
                                         placeholder="100"
                                         value={formData.price}
                                         onChange={e => setFormData({...formData, price: e.target.value})}
@@ -395,123 +563,140 @@
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-700">General Feedback / Context</label>
+                            <label className="text-sm font-semibold text-slate-700">Why do we need this?</label>
                             <textarea
                                 required
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none min-h-[100px]"
-                                placeholder="Why do we need this? Or any general feedback for the club..."
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none min-h-[120px] resize-none transition-all placeholder:text-slate-400"
+                                placeholder="Convince us..."
                                 value={formData.feedback}
                                 onChange={e => setFormData({...formData, feedback: e.target.value})}
                             />
                         </div>
-
-                        <div className="pt-2 flex justify-end gap-3">
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={submitting}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-                            >
-                                {submitting && <Icons.Loader2 className="w-4 h-4 animate-spin" />}
-                                Submit Proposal
-                            </button>
-                        </div>
                     </form>
+                    
+                    <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-5 py-2.5 text-slate-600 hover:bg-slate-200 rounded-xl font-medium transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleSubmit}
+                            disabled={submitting}
+                            className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 shadow-lg shadow-blue-500/30"
+                        >
+                            {submitting && <Icons.Loader2 className="w-4 h-4 animate-spin" />}
+                            Submit Proposal
+                        </button>
+                    </div>
                 </div>
             );
         }
 
-        function SuggestionCard({ data, userId }) {
+        function SuggestionCard({ data, userId, addToast, isGuest }) {
             const hasVoted = data.voters?.includes(userId);
             const date = data.createdAt ? new Date(data.createdAt.seconds * 1000).toLocaleDateString() : 'Just now';
 
             const handleVote = async () => {
-                if (!userId) return;
+                if (isGuest || !userId) {
+                    addToast("Please log in to vote.", "error");
+                    return;
+                }
                 const ref = doc(db, 'artifacts', appId, 'public', 'data', 'suggestions', data.id);
                 
-                if (hasVoted) {
-                    await updateDoc(ref, {
-                        votes: increment(-1),
-                        voters: arrayRemove(userId)
-                    });
-                } else {
-                    await updateDoc(ref, {
-                        votes: increment(1),
-                        voters: arrayUnion(userId)
-                    });
+                try {
+                    if (hasVoted) {
+                        await updateDoc(ref, {
+                            votes: increment(-1),
+                            voters: arrayRemove(userId)
+                        });
+                        // Optional: No toast for removing vote to keep it quiet
+                    } else {
+                        await updateDoc(ref, {
+                            votes: increment(1),
+                            voters: arrayUnion(userId)
+                        });
+                        addToast("Vote registered!", "success");
+                    }
+                } catch (e) {
+                    addToast("Vote failed. Try again.", "error");
                 }
             };
 
             return (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow flex flex-col h-full">
-                    <div className="p-5 flex-1">
-                        <div className="flex justify-between items-start mb-3">
+                <div className="group bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col h-full overflow-hidden">
+                    <div className="p-6 flex-1 flex flex-col">
+                        <div className="flex justify-between items-start mb-4">
                             <StatusBadge status={data.status} />
-                            <span className="text-xs text-slate-400 flex items-center gap-1">
-                                <Icons.Clock className="w-3 h-3" /> {date}
+                            <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-md">
+                                <Icons.Clock className="w-3.5 h-3.5" /> {date}
                             </span>
                         </div>
                         
-                        <h3 className="font-bold text-lg text-slate-900 mb-1 line-clamp-2">{data.productName}</h3>
-                        <div className="flex items-center gap-2 text-sm text-slate-500 mb-3">
-                            <span className="font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
-                                by {data.submitterName}
+                        <h3 className="font-bold text-xl text-slate-800 mb-2 leading-tight">{data.productName}</h3>
+                        
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 mb-5">
+                            <span className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg font-medium text-xs">
+                                By {data.submitterName}
                             </span>
                             {data.price && (
-                                <span className="text-slate-400">| Est. ${data.price}</span>
+                                <span className="font-mono text-slate-400 text-xs">
+                                    Est. {data.price} kr
+                                </span>
                             )}
                         </div>
 
-                        <p className="text-slate-600 text-sm mb-4 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">
-                            "{data.feedback}"
-                        </p>
+                        <div className="relative mb-4 flex-1">
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-slate-200 rounded-full"></div>
+                            <p className="text-slate-600 text-sm pl-4 leading-relaxed italic">
+                                "{data.feedback}"
+                            </p>
+                        </div>
 
                         {data.adminComment && (
-                            <div className="mb-4 text-xs bg-yellow-50 text-yellow-800 p-2 rounded border border-yellow-100">
-                                <strong>Admin Note:</strong> {data.adminComment}
+                            <div className="mt-auto bg-amber-50 border border-amber-100 rounded-xl p-3 text-sm text-amber-900 flex gap-2">
+                                <span className="font-bold text-amber-600 uppercase text-xs tracking-wide shrink-0 mt-0.5">Admin:</span>
+                                <span>{data.adminComment}</span>
                             </div>
                         )}
                     </div>
 
-                    <div className="p-4 bg-slate-50 border-t border-slate-100 rounded-b-xl flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={handleVote}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                                hasVoted 
-                                    ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-500 ring-offset-1' 
-                                    : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200 shadow-sm'
-                                }`}
+                    <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between group-hover:bg-slate-100/50 transition-colors">
+                        <button
+                            onClick={handleVote}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all duration-200 active:scale-95 ${
+                            hasVoted 
+                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30 ring-2 ring-blue-600 ring-offset-2' 
+                                : 'bg-white text-slate-600 hover:bg-white hover:text-blue-600 hover:shadow-md border border-slate-200'
+                            }`}
+                        >
+                            <Icons.ThumbsUp className={`w-4 h-4 ${hasVoted ? 'fill-current animate-bounce' : ''}`} />
+                            <span>{data.votes || 0}</span>
+                        </button>
+                        
+                        {data.productLink && (
+                            <a 
+                                href={data.productLink} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="flex items-center gap-1.5 text-sm font-medium text-slate-400 hover:text-blue-600 transition-colors px-2 py-1 rounded-lg hover:bg-blue-50"
                             >
-                                <Icons.ThumbsUp className={`w-4 h-4 ${hasVoted ? 'fill-current' : ''}`} />
-                                <span>{data.votes || 0}</span>
-                            </button>
-                            {data.productLink && (
-                                <a 
-                                    href={data.productLink} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="text-slate-400 hover:text-blue-600 transition-colors"
-                                    title="View Product"
-                                >
-                                    <Icons.ExternalLink className="w-5 h-5" />
-                                </a>
-                            )}
-                        </div>
+                                <span>Product Link</span>
+                                <Icons.ExternalLink className="w-4 h-4" />
+                            </a>
+                        )}
                     </div>
                 </div>
             );
         }
 
-        function AdminView({ isAdmin, onLogin, onLogout }) {
+        function AdminView({ isAdmin, addToast }) {
+            const [email, setEmail] = useState('');
             const [password, setPassword] = useState('');
             const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
             const [suggestions, setSuggestions] = useState([]);
             
             useEffect(() => {
@@ -527,24 +712,39 @@
                 return () => unsubscribe();
             }, [isAdmin]);
 
-            const handleLoginSubmit = (e) => {
+            const handleLoginSubmit = async (e) => {
                 e.preventDefault();
-                if (!onLogin(password)) {
-                    setError('Incorrect password');
-                } else {
-                    setError('');
+                setLoading(true);
+                setError('');
+                try {
+                    await signInWithEmailAndPassword(auth, email, password);
+                    addToast("Welcome back, Admin!", "success");
+                } catch (err) {
+                    console.error("Login failed", err);
+                    setError('Invalid email or password.');
+                    addToast("Login failed.", "error");
+                } finally {
+                    setLoading(false);
                 }
+            };
+
+            const handleLogout = async () => {
+                await signOut(auth);
+                // Will automatically trigger onAuthStateChanged -> user null -> useEffect -> anonymous login
+                addToast("Signed out successfully.", "success");
             };
 
             const updateStatus = async (id, newStatus) => {
                 await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'suggestions', id), {
                     status: newStatus
                 });
+                addToast("Status updated.", "success");
             };
 
             const deleteItem = async (id) => {
                 if (window.confirm('Are you sure you want to delete this suggestion?')) {
                     await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'suggestions', id));
+                    addToast("Item deleted.", "success");
                 }
             };
 
@@ -554,33 +754,45 @@
                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'suggestions', id), {
                         adminComment: comment
                     });
+                    addToast("Comment added.", "success");
                 }
             };
 
             if (!isAdmin) {
                 return (
-                    <div className="flex items-center justify-center min-h-[60vh]">
-                        <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-lg border border-slate-200">
-                            <div className="text-center mb-6">
-                                <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <Icons.Lock className="w-8 h-8 text-indigo-600" />
+                    <div className="flex items-center justify-center min-h-[60vh] animate-fade-in">
+                        <div className="w-full max-w-md bg-white p-10 rounded-3xl shadow-2xl border border-slate-100">
+                            <div className="text-center mb-8">
+                                <div className="w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+                                    <Icons.Lock className="w-10 h-10 text-indigo-600" />
                                 </div>
                                 <h2 className="text-2xl font-bold text-slate-900">Admin Access</h2>
-                                <p className="text-slate-500">Enter password to manage suggestions</p>
+                                <p className="text-slate-500 mt-2">Sign in with your admin credentials</p>
                             </div>
-                            <form onSubmit={handleLoginSubmit} className="space-y-4">
+                            <form onSubmit={handleLoginSubmit} className="space-y-6">
+                                <div>
+                                    <input
+                                        type="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-lg"
+                                        placeholder="Admin Email"
+                                        required
+                                    />
+                                </div>
                                 <div>
                                     <input
                                         type="password"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        placeholder="Password (try 'admin123')"
+                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-lg"
+                                        placeholder="Password"
+                                        required
                                     />
-                                    {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+                                    {error && <p className="text-red-500 text-sm mt-3 font-medium text-center bg-red-50 py-2 rounded-lg">{error}</p>}
                                 </div>
-                                <button className="w-full py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-colors">
-                                    Unlock Dashboard
+                                <button disabled={loading} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/30 active:scale-95 disabled:opacity-50 flex justify-center">
+                                    {loading ? <Icons.Loader2 className="w-6 h-6 animate-spin"/> : "Secure Login"}
                                 </button>
                             </form>
                         </div>
@@ -589,54 +801,55 @@
             }
 
             return (
-                <div className="space-y-6">
-                    <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div className="space-y-8 animate-fade-in">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 gap-4">
                         <div>
-                            <h2 className="text-2xl font-bold text-slate-800">Admin Dashboard</h2>
-                            <p className="text-slate-500">Manage welfare requests</p>
+                            <h2 className="text-2xl font-bold text-slate-900">Admin Dashboard</h2>
+                            <p className="text-slate-500">Manage suggestions and update statuses</p>
                         </div>
                         <button 
-                            onClick={onLogout}
-                            className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            onClick={handleLogout}
+                            className="flex items-center gap-2 px-6 py-3 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors font-medium border border-slate-200"
                         >
-                            <Icons.LogOut className="w-4 h-4" /> Sign Out
+                            <Icons.LogOut className="w-5 h-5" /> Sign Out
                         </button>
                     </div>
 
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
-                                    <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
-                                        <th className="p-4">Date</th>
-                                        <th className="p-4">Employee</th>
-                                        <th className="p-4">Suggestion</th>
-                                        <th className="p-4">Status</th>
-                                        <th className="p-4 text-center">Votes</th>
-                                        <th className="p-4 text-right">Actions</th>
+                                    <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-bold">
+                                        <th className="p-5">Date</th>
+                                        <th className="p-5">Employee</th>
+                                        <th className="p-5">Suggestion</th>
+                                        <th className="p-5">Status</th>
+                                        <th className="p-5 text-center">Votes</th>
+                                        <th className="p-5 text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {suggestions.map(item => (
-                                        <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-4 text-sm text-slate-500 whitespace-nowrap">
-                                                {item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : '-'}
-                                                <br/>
-                                                <span className="text-xs">{item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}</span>
+                                        <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                                            <td className="p-5 text-sm text-slate-500 whitespace-nowrap">
+                                                <div className="font-medium text-slate-900">{item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : '-'}</div>
+                                                <div className="text-xs text-slate-400">{item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}</div>
                                             </td>
-                                            <td className="p-4 text-sm font-medium text-slate-900">{item.submitterName}</td>
-                                            <td className="p-4 max-w-xs">
-                                                <div className="font-semibold text-slate-800">{item.productName}</div>
-                                                <div className="text-xs text-slate-500 truncate">{item.feedback}</div>
-                                                {item.productLink && <a href={item.productLink} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-1"><Icons.Link className="w-3 h-3"/> Link</a>}
-                                                {item.price && <div className="text-xs text-slate-500 mt-1">Est: ${item.price}</div>}
-                                                {item.adminComment && <div className="text-xs text-indigo-600 mt-1 italic">Note: {item.adminComment}</div>}
+                                            <td className="p-5 text-sm font-semibold text-slate-900">{item.submitterName}</td>
+                                            <td className="p-5 max-w-sm">
+                                                <div className="font-bold text-slate-800 text-base mb-1">{item.productName}</div>
+                                                <div className="text-sm text-slate-500 mb-2 line-clamp-2">{item.feedback}</div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {item.productLink && <a href={item.productLink} target="_blank" rel="noreferrer" className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-md hover:underline flex items-center gap-1"><Icons.Link className="w-3 h-3"/> Link</a>}
+                                                    {item.price && <div className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md">Est: {item.price} kr</div>}
+                                                </div>
+                                                {item.adminComment && <div className="text-xs mt-2 text-amber-600 bg-amber-50 p-2 rounded-lg border border-amber-100">Note: {item.adminComment}</div>}
                                             </td>
-                                            <td className="p-4">
+                                            <td className="p-5">
                                                 <select 
                                                     value={item.status}
                                                     onChange={(e) => updateStatus(item.id, e.target.value)}
-                                                    className="text-xs font-semibold rounded-full px-2 py-1 bg-white border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+                                                    className="text-xs font-bold rounded-lg px-3 py-2 bg-white border border-slate-200 shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer hover:border-indigo-300 transition-colors"
                                                 >
                                                     <option value="new">New</option>
                                                     <option value="review">Reviewing</option>
@@ -645,30 +858,36 @@
                                                     <option value="rejected">Rejected</option>
                                                 </select>
                                             </td>
-                                            <td className="p-4 text-center font-bold text-slate-700">{item.votes || 0}</td>
-                                            <td className="p-4 text-right space-x-2">
-                                                <button 
-                                                    onClick={() => addAdminComment(item.id)}
-                                                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
-                                                    title="Add Comment"
-                                                >
-                                                    <Icons.MessageSquarePlus className="w-4 h-4" />
-                                                </button>
-                                                <button 
-                                                    onClick={() => deleteItem(item.id)}
-                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
-                                                    title="Delete"
-                                                >
-                                                    <Icons.Trash2 className="w-4 h-4" />
-                                                </button>
+                                            <td className="p-5 text-center">
+                                                <span className="inline-block font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-lg">
+                                                    {item.votes || 0}
+                                                </span>
+                                            </td>
+                                            <td className="p-5 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button 
+                                                        onClick={() => addAdminComment(item.id)}
+                                                        className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                                                        title="Add Comment"
+                                                    >
+                                                        <Icons.MessageSquarePlus className="w-5 h-5" />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => deleteItem(item.id)}
+                                                        className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                                        title="Delete"
+                                                    >
+                                                        <Icons.Trash2 className="w-5 h-5" />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                             {suggestions.length === 0 && (
-                                <div className="p-8 text-center text-slate-500">
-                                    No suggestions found.
+                                <div className="p-12 text-center text-slate-400 bg-slate-50/50">
+                                    No suggestions found yet.
                                 </div>
                             )}
                         </div>
@@ -679,11 +898,11 @@
 
         function StatusBadge({ status }) {
             const styles = {
-                new: "bg-blue-100 text-blue-700 border-blue-200",
-                review: "bg-orange-100 text-orange-800 border-orange-200",
-                approved: "bg-green-100 text-green-700 border-green-200",
-                ordered: "bg-purple-100 text-purple-700 border-purple-200",
-                rejected: "bg-red-100 text-red-700 border-red-200",
+                new: "bg-blue-100 text-blue-800 border-blue-200",
+                review: "bg-amber-100 text-amber-800 border-amber-200",
+                approved: "bg-emerald-100 text-emerald-800 border-emerald-200",
+                ordered: "bg-violet-100 text-violet-800 border-violet-200",
+                rejected: "bg-rose-100 text-rose-800 border-rose-200",
             };
             
             const labels = {
@@ -695,7 +914,7 @@
             };
 
             return (
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${styles[status] || styles.new} uppercase tracking-wide`}>
+                <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${styles[status] || styles.new} uppercase tracking-wider shadow-sm`}>
                     {labels[status] || labels.new}
                 </span>
             );
